@@ -6,11 +6,15 @@ from tkinter.scrolledtext import *
 import tkinter.filedialog
 
 # NLP
-from summerizer import nltk_summarizer
+from summarizer import nltk_summarizer
+from scrape import scrapeURL
 
 # Scraper
+from mediawiki import MediaWiki
 from bs4 import BeautifulSoup
 from urllib.request import urlopen
+
+wikipedia = MediaWiki()
 
 '''############### WINDOW CREATION ###############'''
 
@@ -33,12 +37,10 @@ tabs = ttk.Notebook(window, width=200, height=200)
 tabOne = ttk.Frame(tabs)
 tabTwo = ttk.Frame(tabs)
 tabThree = ttk.Frame(tabs)
-tabFour = ttk.Frame(tabs)
 
 tabs.add(tabOne, text='Summ-it Text')
 tabs.add(tabTwo, text='Summ-it File')
-tabs.add(tabThree, text='Summ-it URL')
-tabs.add(tabFour, text='Summ-it Search')
+tabs.add(tabThree, text='Summ-it WikiScrape')
 
 # Labels
 tabs.pack(expand=True, fill=tk.BOTH)
@@ -61,13 +63,6 @@ def SummarizeFile():
     outputEntryBoxTabTwo.insert(tk.END, result)
 
 
-def SummarizeURL():
-    textIn = str(inputEntryBoxTabThree.get('1.0', tk.END))
-    textOut = nltk_summarizer(textIn)
-    result = '\nSummary:{}'.format(textOut)
-    outputEntryBoxTabThree.insert(tk.END, result)
-
-
 # Clear Input
 def ClearEntryText():
     inputEntryBoxTabOne.delete('1.0', END)
@@ -79,6 +74,9 @@ def ClearEntryFile():
 
 def ClearEntryURL():
     inputEntryBoxTabThree.delete('1.0', END)
+    outputContentTabThree.delete('1.0', END)
+    pageTitle.set('')
+    outputSummaryTabThree.delete('1.0', END)
 
 
 # Clear Output
@@ -90,13 +88,10 @@ def ClearOutputFile():
     outputEntryBoxTabTwo.delete('1.0', END)
 
 
-def ClearOutputURL():
-    outputEntryBoxTabThree.delete('1.0', END)
-
-
 # Open a file
 def OpenFile():
-    fileOne = tkinter.filedialog.askopenfilename(filetypes=(("Text Files", ".txt"), ("All files", "*")))
+    fileOne = tkinter.filedialog.askopenfilename(
+        filetypes=(("Text Files", ".txt"), ("All files", "*")))
     readText = open(fileOne, 'rt', encoding='utf-8').read()
     inputEntryBoxTabTwo.insert(tk.END, readText)
 
@@ -105,10 +100,11 @@ def OpenFile():
 def GetTextFromURL():
     textIn = str(inputEntryBoxTabThree.get('1.0', tk.END))
     inputEntryBoxTabThree.delete('1.0', END)
-    page = urlopen(textIn)
-    soup = BeautifulSoup(page)
-    textOut = ' '.join(map(lambda p: p.text, soup.find_all('p')))
-    inputEntryBoxTabThree.insert(tk.END, textOut)
+    page = wikipedia.page(textIn)
+    textOut = page.summarize()
+    pageTitle.set(page.title)
+    outputContentTabThree.insert(tk.END, page.content)
+    outputSummaryTabThree.insert(tk.END, textOut)
 
 
 '''############### HOME TAB ###############'''
@@ -125,9 +121,12 @@ inputEntryBoxTabOne.grid(column=0, row=3, columnspan=3, padx=10)
 outputEntryBoxTabOne.grid(column=0, row=8, columnspan=3, padx=10)
 
 # Buttons
-resetInputButton = Button(tabOne, text='Reset Input', command=ClearEntryText, width=12, bg='red', fg='black')
-submitButton = Button(tabOne, text='Summarize', command=SummarizeText, width=12, bg='blue', fg='#fff')
-resetOutputButton = Button(tabOne, text='Reset Output', command=ClearOutputText, width=12, bg='red', fg='black')
+resetInputButton = Button(tabOne, text='Reset Input',
+                          command=ClearEntryText, width=12, bg='red', fg='black')
+submitButton = Button(tabOne, text='Summarize',
+                      command=SummarizeText, width=12, bg='blue', fg='#fff')
+resetOutputButton = Button(tabOne, text='Reset Output',
+                           command=ClearOutputText, width=12, bg='red', fg='black')
 
 resetInputButton.grid(row=4, column=2, pady=10, padx=10)
 submitButton.grid(row=5, column=1, pady=10, padx=10)
@@ -148,10 +147,14 @@ outputEntryBoxTabTwo.grid(column=0, row=8, columnspan=3, padx=10)
 outputEntryBoxTabTwo.config(state=NORMAL)
 
 # Buttons
-openFileButton = Button(tabTwo, text='Open File', command=OpenFile, width=12, bg='#25d366', fg='#fff')
-resetInputButton = Button(tabTwo, text='Reset Input', command=ClearEntryFile, width=12, bg='red', fg='black')
-submitButton = Button(tabTwo, text='Summarize', command=SummarizeFile, width=12, bg='blue', fg='#fff')
-resetOutputButton = Button(tabTwo, text='Reset Output', command=ClearOutputFile, width=12, bg='red', fg='black')
+openFileButton = Button(tabTwo, text='Open File',
+                        command=OpenFile, width=12, bg='#25d366', fg='#fff')
+resetInputButton = Button(tabTwo, text='Reset Input',
+                          command=ClearEntryFile, width=12, bg='red', fg='black')
+submitButton = Button(tabTwo, text='Summarize',
+                      command=SummarizeFile, width=12, bg='blue', fg='#fff')
+resetOutputButton = Button(tabTwo, text='Reset Output',
+                           command=ClearOutputFile, width=12, bg='red', fg='black')
 
 openFileButton.grid(row=4, column=0, pady=10, padx=10)
 resetInputButton.grid(row=4, column=2, pady=10, padx=10)
@@ -160,27 +163,43 @@ resetOutputButton.grid(row=9, column=2, pady=10, padx=10)
 
 '''############### URL TAB ###############'''
 
-titleLabel = Label(tabThree, text='Enter a URL to Summarize', padx=5, pady=5)
+titleLabel = Label(
+    tabThree, text='Please enter something to search for', padx=5, pady=5)
 titleLabel.config(font=("Courier", 14))
 titleLabel.grid(column=0, row=0, columnspan=3, rowspan=2)
 
+pageTitle = StringVar()
+pageLabel = Label(tabThree, textvariable=pageTitle, padx=5, pady=5, fg='red')
+pageLabel.config(font=("Courier", 12))
+pageLabel.grid(column=0, columnspan=3, row=6)
+
+contentLabel = Label(tabThree, text="Content Of Wiki", padx=5, pady=5)
+contentLabel.config(font=("Courier", 10))
+contentLabel.grid(column=0, columnspan=3, row=8)
+
+summaryLabel = Label(tabThree, text="Summary of Text", padx=5, pady=5)
+summaryLabel.config(font=("Courier", 10))
+summaryLabel.grid(column=0, columnspan=3, row=10)
+
 # Entry Boxes
-inputEntryBoxTabThree = ScrolledText(tabThree, height=10)
-outputEntryBoxTabThree = ScrolledText(tabThree, height=10)
+inputEntryBoxTabThree = Text(tabThree, height=1)
+outputContentTabThree = ScrolledText(tabThree, height=10)
+outputSummaryTabThree = ScrolledText(tabThree, height=10)
 
 inputEntryBoxTabThree.grid(column=0, row=3, columnspan=3, padx=10)
-outputEntryBoxTabThree.grid(column=0, row=8, columnspan=3, padx=10)
-outputEntryBoxTabThree.config(state=NORMAL)
+outputContentTabThree.grid(column=0, row=9, columnspan=3, padx=10)
+outputSummaryTabThree.grid(column=0, row=11, columnspan=3, padx=10)
+
+outputSummaryTabThree.config(state=NORMAL)
 
 # Buttons
-getTextFromURLButton = Button(tabThree, text='Process URL', command=GetTextFromURL, width=12, bg='#25d366', fg='#fff')
-resetInputButton = Button(tabThree, text='Clear Text', command=ClearEntryURL, width=12, bg='red', fg='black')
-submitButton = Button(tabThree, text='Summarize', command=SummarizeURL, width=12, bg='blue', fg='#fff')
-resetOutputButton = Button(tabThree, text='Clear Output', command=ClearOutputURL, width=12, bg='red', fg='black')
+getTextFromURLButton = Button(tabThree, text='Search Wikipedia',
+                              command=GetTextFromURL, width=12, bg='#25d366', fg='#fff')
+resetInputButton = Button(tabThree, text='Clear Text',
+                          command=ClearEntryURL, width=12, bg='red', fg='black')
 
 getTextFromURLButton.grid(row=5, column=0, pady=10, padx=10)
 resetInputButton.grid(row=5, column=2, pady=10, padx=10)
-submitButton.grid(row=6, column=1, pady=10, padx=10)
-resetOutputButton.grid(row=9, column=2, pady=10, padx=10)
+
 
 window.mainloop()
