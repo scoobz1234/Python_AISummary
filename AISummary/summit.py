@@ -4,10 +4,12 @@ from tkinter import *
 from tkinter import ttk
 from tkinter.scrolledtext import *
 import tkinter.filedialog
+from gtts import gTTS
+import os
+import pygame
 
 # NLP
 from summarizer import nltk_summarizer
-from scrape import scrapeURL
 
 # Scraper
 from mediawiki import MediaWiki
@@ -15,6 +17,7 @@ from bs4 import BeautifulSoup
 from urllib.request import urlopen
 
 wikipedia = MediaWiki()
+pygame.init()
 
 '''############### WINDOW CREATION ###############'''
 
@@ -105,6 +108,27 @@ def GetTextFromURL():
     pageTitle.set(page.title)
     outputContentTabThree.insert(tk.END, page.content)
     outputSummaryTabThree.insert(tk.END, textOut)
+    tts = gTTS(text=outputSummaryTabThree.get('1.0', tk.END), lang='en')
+    tts.save('Summary.mp3')
+
+def SpeakIt():
+    pygame.mixer.music.load('Summary.mp3')
+    pygame.mixer.music.play(1)
+
+def PauseIt():
+    global pauseBool
+    if pauseBool == True:
+        pygame.mixer.music.unpause()
+        pauseSpeechButton.config(text='Pause')
+        pauseBool = False
+    else:
+        pygame.mixer.music.pause()
+        pauseSpeechButton.config(text='Resume')
+        pauseBool = True
+
+def StopIt():
+    pygame.mixer.music.stop()
+    
 
 
 '''############### HOME TAB ###############'''
@@ -163,15 +187,14 @@ resetOutputButton.grid(row=9, column=2, pady=10, padx=10)
 
 '''############### URL TAB ###############'''
 
-titleLabel = Label(
-    tabThree, text='Please enter something to search for', padx=5, pady=5)
+titleLabel = Label(tabThree, text='Please enter something to search for', padx=5, pady=5)
 titleLabel.config(font=("Courier", 14))
 titleLabel.grid(column=0, row=0, columnspan=3, rowspan=2)
 
 pageTitle = StringVar()
 pageLabel = Label(tabThree, textvariable=pageTitle, padx=5, pady=5, fg='red')
 pageLabel.config(font=("Courier", 12))
-pageLabel.grid(column=0, columnspan=3, row=6)
+pageLabel.grid(column=1, row=6)
 
 contentLabel = Label(tabThree, text="Content Of Wiki", padx=5, pady=5)
 contentLabel.config(font=("Courier", 10))
@@ -192,14 +215,21 @@ outputSummaryTabThree.grid(column=0, row=11, columnspan=3, padx=10)
 
 outputSummaryTabThree.config(state=NORMAL)
 
+# Boolean used for tracking playback
+pauseBool = False
+
 # Buttons
-getTextFromURLButton = Button(tabThree, text='Search Wikipedia',
-                              command=GetTextFromURL, width=12, bg='#25d366', fg='#fff')
-resetInputButton = Button(tabThree, text='Clear Text',
-                          command=ClearEntryURL, width=12, bg='red', fg='black')
+getTextFromURLButton = Button(tabThree, text='Search Wikipedia', command=GetTextFromURL, width=12, bg='#25d366', fg='#fff')
+resetInputButton = Button(tabThree, text='Clear Text', command=ClearEntryURL, width=12, bg='red', fg='black')
+textToSpeechButton = Button(tabThree, text='SpeakIt', command=SpeakIt, width=4, bg='#25d366', fg='#fff')
+pauseSpeechButton = Button(tabThree, text='Pause', command=PauseIt, width=4, bg='blue', fg='white')
+stopSpeechButton = Button(tabThree, text='Stop', command=StopIt, width=4, bg='red', fg='black')
+
 
 getTextFromURLButton.grid(row=5, column=0, pady=10, padx=10)
 resetInputButton.grid(row=5, column=2, pady=10, padx=10)
-
+textToSpeechButton.grid(row=12, column=0)
+pauseSpeechButton.grid(row=12, column=1)
+stopSpeechButton.grid(row=12, column=2)
 
 window.mainloop()
